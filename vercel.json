@@ -1,6 +1,6 @@
 {
   "functions": {
-    "pages/api/timeline.ts": {
+    "api/timeline.ts": {
       "maxDuration": 60
     }
   }
