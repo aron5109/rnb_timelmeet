@@ -9,7 +9,7 @@ export async function setupDatabase() {
       nefnd TEXT,
       dagsetning TIMESTAMPTZ,
       titill TEXT,
-      thatttakendur TEXT[],
+      thatttakendur JSONB,
       dagskrarlidur JSONB,
       source_url TEXT,
       leitartexti TSVECTOR,
