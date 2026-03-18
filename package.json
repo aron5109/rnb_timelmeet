@@ -1,18 +1,18 @@
 {
-  "name": "rnb-timalina",
-  "version": "1.0.0",
+  "name": "timelines",
+  "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "lint": "next lint"
   },
   "dependencies": {
     "next": "14.2.3",
     "react": "^18",
     "react-dom": "^18",
-    "@anthropic-ai/sdk": "^0.24.0",
-    "cheerio": "^1.0.0-rc.12"
+    "@vercel/postgres": "^0.9.0"
   },
   "devDependencies": {
     "@types/node": "^20",

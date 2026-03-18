@@ -1,73 +1,64 @@
-# Tímalína Bæjarstjórnar Reykjanesbæjar
+# Fundargerðir Reykjanesbæjar
 
-Gagnvirk tímalína sem greini fundargerðir bæjarstjórnar Reykjanesbæjar með Claude gervigreind.
+Leit og tímalína fundargerða bæjarstjórnar og nefnda Reykjanesbæjar.
 
-## Eiginleikar
-
-- 🔄 Sækir sjálfkrafa nýjustu fundargerðir frá reykjanesbaer.is
-- 🤖 Notar Claude til að greina og skipuleggja atburði
-- 🗓 Gagnvirk tímalína með síum og leit
-- 🎨 Reykjanesbær hönnunarstaðall (blár #003865, gullinn #C8A951)
-- 📱 Svarar á öllum skjástærðum
-- 🖨 Prentvinænn
-
-## Uppsetning á Vercel
-
-### 1. Klóna verkefnið
-```bash
-git clone <your-repo-url>
-cd rnb-timalina
-```
-
-### 2. Setja upp á Vercel
-1. Farðu á [vercel.com](https://vercel.com) og skráðu þig inn
-2. Smelltu á **"Add New Project"**
-3. Tengdu GitHub geymslu þína
-4. Undir **Environment Variables** bættu við:
-   - `ANTHROPIC_API_KEY` = þitt Anthropic API lykill
-5. Smelltu á **Deploy**
-
-### 3. Anthropic API lykill
-Sæktu API lykil á [console.anthropic.com](https://console.anthropic.com)
-
-## Keyra staðbundið
-
-```bash
-npm install
-cp .env.local.example .env.local
-# Breyttu ANTHROPIC_API_KEY í .env.local
-npm run dev
-```
-
-Farðu á http://localhost:3000
-
-## Tæknileg uppbygging
+## Uppbygging
 
 ```
-pages/
-  index.tsx          # Aðalsíða með gagnvirkri tímalínu
+app/
+  page.tsx                    ← Aðalsíða (UI)
   api/
-    timeline.ts      # API endpoint: sækir og greinir fundargerðir
+    fundargerdir/route.ts     ← Leit í fundargerðum
+    mal/route.ts              ← Tímalína eins máls
+    ingest/route.ts           ← Geyma fundargerðir í DB
 lib/
-  scraper.ts         # Sækir fundargerðir frá reykjanesbaer.is
-  analyzer.ts        # Claude AI greining
-  types.ts           # TypeScript týpur
+  db.ts                       ← Gagnagrunnur
+scripts/
+  fetch_baejarstjorn.py       ← Sækir HTML fundargerðir
+  parse_fundargerd.py         ← Þáttar HTML í JSON
+  ingest.py                   ← Sendir á API
 ```
 
-## Vercel Timeout
+## Uppsetning
 
-API endapunkturinn getur tekið allt að 60 sekúndur. Með Vercel Pro er hægt að auka tímamark í `vercel.json`:
+### 1. Vercel Postgres
 
-```json
-{
-  "functions": {
-    "pages/api/timeline.ts": {
-      "maxDuration": 60
-    }
-  }
-}
+1. Farðu á [vercel.com](https://vercel.com) → þitt verkefni → **Storage**
+2. Smelltu á **Create Database** → **Postgres**
+3. Gefðu henni nafn t.d. `timelines-db`
+4. Veldu **Connect** → Vercel setur sjálfkrafa inn env breytur
+
+### 2. INGEST_SECRET
+
+Í Vercel → **Settings** → **Environment Variables** bættu við:
+- `INGEST_SECRET` = eitthvað langt og handahófskennt, t.d. `rnb2024superleynilegt`
+
+### 3. GitHub
+
+Hlaðaðu upp öllum skrám í `rnb-timalina/` möppuna á GitHub.
+Vercel redeploy-ar sjálfkrafa.
+
+### 4. Sækja fundargerðir (Python)
+
+```bash
+# Setja upp
+pip install beautifulsoup4
+
+# Sækja HTML (50 nýjustu)
+python scripts/fetch_baejarstjorn.py --limit 50 --output ./html_baejarstjorn
+
+# Senda á API
+python scripts/ingest.py \
+  --html ./html_baejarstjorn \
+  --api https://timelines-three.vercel.app \
+  --secret rnb2024superleynilegt
 ```
 
-## Höfundarréttur
+## Bæta við fleiri nefndum
 
-Fundargerðirnar tilheyra Reykjanesbæ. Þetta tól er opið og óopinbert.
+Síðar getum við bætt við t.d. bæjarráði:
+```bash
+python scripts/fetch_baejarstjorn.py \
+  --url https://www.reykjanesbaer.is/is/stjornsysla/stjornsyslan/fundargerdir/baejarrad \
+  --output ./html_baejarrad
+```
