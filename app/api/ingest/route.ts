@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
       const result = await sql`
         INSERT INTO fundargerdir (
           filename, fund_numer, nefnd, dagsetning, titill,
-          thatttakendur, dagskrarlidur, source_url, leitartexti
+          thatttakendur, dagskrarlidur, source_url, leitartexti, vidstaddir_texti
         )
         VALUES (
           ${fg.filename as string},
@@ -63,7 +63,8 @@ export async function POST(request: NextRequest) {
           ${JSON.stringify(fg.thatttakendur || [])},
           ${JSON.stringify(fg.dagskrarlidur)}::jsonb,
           ${fg.source_url as string},
-          to_tsvector('simple', ${leitartexti})
+          to_tsvector('simple', ${leitartexti}),
+          ${(fg.vidstaddir_texti as string) || null}
         )
         ON CONFLICT (filename) DO UPDATE SET
           fund_numer = EXCLUDED.fund_numer,
@@ -74,6 +75,7 @@ export async function POST(request: NextRequest) {
           dagskrarlidur = EXCLUDED.dagskrarlidur,
           source_url = EXCLUDED.source_url,
           leitartexti = EXCLUDED.leitartexti,
+          vidstaddir_texti = EXCLUDED.vidstaddir_texti,
           updated_at = NOW()
         RETURNING id, (xmax = 0) AS was_inserted
       `;

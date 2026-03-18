@@ -33,8 +33,22 @@ export async function GET(request: NextRequest) {
     }
 
     if (id) {
-      const r = await sql`SELECT id, fund_numer, nefnd, dagsetning, titill, thatttakendur, dagskrarlidur, source_url FROM fundargerdir WHERE id = ${parseInt(id)}`;
+      const r = await sql`SELECT id, fund_numer, nefnd, dagsetning, titill, thatttakendur, dagskrarlidur, source_url, vidstaddir_texti FROM fundargerdir WHERE id = ${parseInt(id)}`;
       return NextResponse.json(r.rows[0] || {});
+    }
+
+    // Search by person name (attendee)
+    const nafn = searchParams.get('nafn');
+    if (nafn) {
+      const r = await sql`
+        SELECT id, fund_numer, nefnd, dagsetning, titill, thatttakendur, source_url
+        FROM fundargerdir
+        WHERE thatttakendur::text ILIKE ${'%' + nafn + '%'}
+           OR vidstaddir_texti ILIKE ${'%' + nafn + '%'}
+        ORDER BY dagsetning DESC
+        LIMIT 100
+      `;
+      return NextResponse.json({ results: r.rows, total: r.rows.length });
     }
 
     // Byggja upp síur sem strengi

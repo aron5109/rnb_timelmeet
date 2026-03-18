@@ -6,6 +6,7 @@ interface Fundargerd {
   id: number; fund_numer: number; nefnd: string;
   dagsetning: string; titill: string;
   thatttakendur: string[]; source_url: string;
+  vidstaddir_texti?: string;
 }
 interface DagskrarLidur {
   numer: number; heiti: string; texti: string;
@@ -19,6 +20,7 @@ interface TimelineAtrid {
   fundargerd_id: number; source_url: string;
 }
 interface MalTimeline { malsnumer: string; timeline: TimelineAtrid[]; fjoldi: number; }
+interface PersonFundir { nafn: string; fundir: Fundargerd[]; fjoldi: number; }
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const C = {
@@ -114,6 +116,68 @@ function IconUsers({ size = 14, color = C.textMuted }: { size?: number; color?: 
       <path d="M16 3.13a4 4 0 0 1 0 7.75" />
     </svg>
   );
+}
+
+// ── Attendee parsing ────────────────────────────────────────────────────────────
+interface ParsedAttendees {
+  nefndarmenn: string[];
+  forseti: string | null;
+  starfsmenn: string;
+  raw: string;
+}
+
+function parseAttendeesFromText(text: string): ParsedAttendees | null {
+  if (!text) return null;
+
+  const result: ParsedAttendees = { nefndarmenn: [], forseti: null, starfsmenn: '', raw: text };
+
+  // Extract "Viðstaddir:" line names + "Í forsæti var [name]."
+  const vidstaddirMatch = text.match(/Viðstaddir:\s*([\s\S]*?)(?=Að auki|$)/i);
+  if (!vidstaddirMatch) return null;
+
+  const vidstaddirBlock = vidstaddirMatch[1].trim();
+
+  // Extract "Í forsæti var [name]."
+  const forsetiMatch = vidstaddirBlock.match(/Í forsæti var\s+([^.]+)\./i);
+  if (forsetiMatch) {
+    result.forseti = forsetiMatch[1].trim();
+  }
+
+  // Get names before "Í forsæti"
+  const namesBlock = vidstaddirBlock.split(/Í forsæti/i)[0].trim();
+  // Split on commas and "og"
+  const names = namesBlock
+    .replace(/\s+og\s+/g, ', ')
+    .split(',')
+    .map(n => n.trim().replace(/\.$/, ''))
+    .filter(n => n.length > 2);
+  result.nefndarmenn = names;
+
+  // Extract "Að auki sátu fundinn..." section
+  const adAukiMatch = text.match(/Að auki sátu fundinn\s*([\s\S]*)/i);
+  if (adAukiMatch) {
+    result.starfsmenn = adAukiMatch[1].trim();
+  }
+
+  return result;
+}
+
+function extractNamesFromText(text: string): string[] {
+  // Extract individual names from a text block (staff + forföll section)
+  // Names are typically: "Firstname Lastname title, Firstname Lastname title"
+  // or "Firstname Lastname boðaði forföll"
+  const names: string[] = [];
+  // Match Icelandic name patterns (capitalized words followed by lowercase)
+  const namePattern = /([A-ZÁÉÍÓÚÝÞÆÖÐ][a-záéíóúýþæöð]+(?:\s+[A-ZÁÉÍÓÚÝÞÆÖÐ][a-záéíóúýþæöð]+)+)/g;
+  let m;
+  while ((m = namePattern.exec(text)) !== null) {
+    const candidate = m[1].trim();
+    // Filter out common non-name phrases
+    if (!candidate.match(/^(Að auki|Í forsæti|sat fundinn|sat fyrir|boðaði forföll)/i)) {
+      names.push(candidate);
+    }
+  }
+  return names;
 }
 
 // ── MalsnumerTag ────────────────────────────────────────────────────────────────
@@ -296,6 +360,123 @@ function TimelineModal({ data, onClose, onOpen }: {
   );
 }
 
+// ── Person Modal ──────────────────────────────────────────────────────────────
+function PersonModal({ data, onClose, onOpen }: {
+  data: PersonFundir; onClose: () => void; onOpen: (id: number) => void;
+}) {
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0,
+      background: 'rgba(10,18,40,0.6)',
+      backdropFilter: 'blur(4px)',
+      zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem',
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: C.surface, borderRadius: 12, maxWidth: 680, width: '100%',
+        maxHeight: '90vh', overflowY: 'auto',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+        border: `1px solid ${C.border}`,
+      }}>
+        {/* Header */}
+        <div style={{
+          padding: '1.5rem 1.75rem 1.25rem',
+          borderBottom: `1px solid ${C.border}`,
+          display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+          position: 'sticky', top: 0, background: C.surface, zIndex: 1,
+          borderRadius: '12px 12px 0 0',
+        }}>
+          <div>
+            <div style={{
+              fontSize: '0.65rem', color: C.gold, letterSpacing: '0.16em',
+              textTransform: 'uppercase', marginBottom: '0.4rem', fontWeight: 600,
+            }}>
+              Þátttakandi · Fundarsaga
+            </div>
+            <div style={{
+              fontSize: '1.4rem', color: C.navy, fontWeight: 700,
+              letterSpacing: '-0.01em',
+            }}>
+              {data.nafn}
+            </div>
+            <div style={{
+              fontSize: '0.82rem', color: C.textMuted, marginTop: '0.3rem',
+            }}>
+              {data.fjoldi === 1 ? 'Sat 1 fund' : `Sat ${data.fjoldi} fundi`}
+            </div>
+          </div>
+          <button onClick={onClose} style={{
+            background: C.bg, border: 'none', borderRadius: 8,
+            width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', flexShrink: 0, marginLeft: '1rem', transition: 'background 0.15s',
+          }}>
+            <IconClose size={16} color={C.textSub} />
+          </button>
+        </div>
+
+        {/* Meeting list */}
+        <div style={{ padding: '1.25rem 1.75rem' }}>
+          {data.fundir.length === 0
+            ? <p style={{ color: C.textMuted, fontStyle: 'italic', textAlign: 'center', padding: '2rem 0' }}>Engir fundir fundnir.</p>
+            : data.fundir.map((fg, i) => (
+              <div key={i} style={{
+                display: 'flex', gap: '1rem', alignItems: 'flex-start',
+                padding: '0.85rem 1rem', marginBottom: '0.5rem',
+                borderRadius: 8, border: `1px solid ${C.border}`,
+                cursor: 'pointer', transition: 'all 0.15s',
+              }}
+              onClick={() => { onClose(); onOpen(fg.id); }}
+              onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = C.gold; (e.currentTarget as HTMLDivElement).style.background = C.goldPale; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = C.border; (e.currentTarget as HTMLDivElement).style.background = 'transparent'; }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '0.25rem' }}>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: C.text }}>
+                      {fg.fund_numer ? `${fg.fund_numer}. fundur` : fg.titill}
+                    </span>
+                    {fg.nefnd && (
+                      <span style={{
+                        fontSize: '0.65rem', background: C.bluePale, color: C.blueText,
+                        padding: '0.1rem 0.45rem', borderRadius: 20, fontWeight: 600,
+                      }}>{fg.nefnd}</span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.77rem', color: C.textMuted }}>
+                    <IconCalendar size={12} color={C.textMuted} />
+                    {formatDate(fg.dagsetning, true)}
+                  </div>
+                </div>
+                <IconExternalLink size={12} color={C.textMuted} />
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Clickable Name ────────────────────────────────────────────────────────────
+function ClickableName({ name, onClick }: { name: string; onClick: (name: string) => void }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <button
+      onClick={e => { e.stopPropagation(); onClick(name); }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        background: 'none', border: 'none', padding: 0, margin: 0,
+        color: hover ? C.blueText : C.textSub,
+        textDecoration: hover ? 'underline' : 'none',
+        cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit',
+        fontWeight: 'inherit', lineHeight: 'inherit',
+        transition: 'color 0.15s',
+      }}
+    >
+      {name}
+    </button>
+  );
+}
+
 // ── Main Page ──────────────────────────────────────────────────────────────────
 export default function Home() {
   const [query, setQuery] = useState('');
@@ -311,6 +492,8 @@ export default function Home() {
   const [timeline, setTimeline] = useState<MalTimeline | null>(null);
   const [timelineLoading, setTimelineLoading] = useState(false);
   const [hoveredCard, setHoveredCard] = useState<number | null>(null);
+  const [personData, setPersonData] = useState<PersonFundir | null>(null);
+  const [personLoading, setPersonLoading] = useState(false);
 
   useEffect(() => {
     fetch('/api/fundargerdir?nefndir=1').then(r => r.json()).then(d => setNefndir(d.nefndir)).catch(() => {});
@@ -344,6 +527,44 @@ export default function Home() {
     try {
       setTimeline(await (await fetch(`/api/mal?nr=${encodeURIComponent(malsnumer)}`)).json());
     } finally { setTimelineLoading(false); }
+  };
+
+  const openPerson = async (nafn: string) => {
+    setPersonLoading(true); setPersonData(null);
+    try {
+      const res = await (await fetch(`/api/fundargerdir?nafn=${encodeURIComponent(nafn)}`)).json();
+      setPersonData({ nafn, fundir: res.results || [], fjoldi: res.total || 0 });
+    } finally { setPersonLoading(false); }
+  };
+
+  // Render text with clickable málsnúmer (10-digit numbers in parentheses)
+  const renderTextWithMalsnumer = (text: string): React.ReactNode => {
+    const parts = text.split(/(\(\d{10}\))/g);
+    if (parts.length === 1) return text;
+    return parts.map((part, i) => {
+      const match = part.match(/^\((\d{10})\)$/);
+      if (match) {
+        return (
+          <button
+            key={i}
+            onClick={e => { e.stopPropagation(); openTimeline(match[1]); }}
+            title={`Sjá sögu máls ${match[1]}`}
+            style={{
+              background: C.goldPale, border: `1px solid #e8c87a`,
+              borderRadius: 4, padding: '0 0.3rem',
+              fontSize: 'inherit', color: '#92650a', cursor: 'pointer',
+              fontFamily: 'monospace', fontWeight: 600,
+              transition: 'all 0.15s', lineHeight: 'inherit',
+            }}
+            onMouseEnter={e => { (e.target as HTMLButtonElement).style.background = '#fdf0d0'; (e.target as HTMLButtonElement).style.borderColor = C.gold; }}
+            onMouseLeave={e => { (e.target as HTMLButtonElement).style.background = C.goldPale; (e.target as HTMLButtonElement).style.borderColor = '#e8c87a'; }}
+          >
+            ({match[1]})
+          </button>
+        );
+      }
+      return <span key={i}>{part}</span>;
+    });
   };
 
   const hasFilters = nefnd || fra || til;
@@ -380,6 +601,33 @@ export default function Home() {
 
       {timeline && !timelineLoading && (
         <TimelineModal data={timeline} onClose={() => setTimeline(null)} onOpen={openDetail} />
+      )}
+
+      {/* Loading overlay for person search */}
+      {personLoading && (
+        <div style={{
+          position: 'fixed', inset: 0,
+          background: 'rgba(10,18,40,0.5)',
+          backdropFilter: 'blur(4px)',
+          zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <div style={{
+            background: C.surface, borderRadius: 12, padding: '1.75rem 2.5rem',
+            display: 'flex', alignItems: 'center', gap: '0.75rem',
+            boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
+          }}>
+            <div style={{
+              width: 18, height: 18, border: `2px solid ${C.border}`,
+              borderTop: `2px solid ${C.navy}`, borderRadius: '50%',
+              animation: 'spin 0.8s linear infinite',
+            }} />
+            <span style={{ color: C.textSub, fontSize: '0.9rem' }}>Sæki fundarsögu...</span>
+          </div>
+        </div>
+      )}
+
+      {personData && !personLoading && (
+        <PersonModal data={personData} onClose={() => setPersonData(null)} onOpen={openDetail} />
       )}
 
       {/* ── Header ── */}
@@ -778,28 +1026,117 @@ export default function Home() {
                     {formatDate(selected.dagsetning)}
                   </div>
 
-                  {selected.thatttakendur?.length > 0 && (
-                    <div style={{
-                      marginBottom: '1.25rem',
-                      background: C.bg, borderRadius: 8, padding: '0.85rem 1rem',
-                      border: `1px solid ${C.border}`,
-                    }}>
-                      <div style={{
-                        fontSize: '0.68rem', textTransform: 'uppercase',
-                        letterSpacing: '0.12em', color: C.textMuted,
-                        marginBottom: '0.5rem', fontWeight: 600,
-                        display: 'flex', alignItems: 'center', gap: '0.35rem',
-                      }}>
-                        <IconUsers size={12} color={C.textMuted} />
-                        Þátttakendur
-                      </div>
-                      <div style={{
-                        fontSize: '0.83rem', color: C.textSub, lineHeight: 1.7,
-                      }}>
-                        {selected.thatttakendur.join(' · ')}
-                      </div>
-                    </div>
-                  )}
+                  {(() => {
+                    const parsed = selected.vidstaddir_texti
+                      ? parseAttendeesFromText(selected.vidstaddir_texti)
+                      : null;
+
+                    if (parsed && parsed.nefndarmenn.length > 0) {
+                      return (
+                        <div style={{
+                          marginBottom: '1.25rem',
+                          background: C.bg, borderRadius: 8, padding: '0.85rem 1rem',
+                          border: `1px solid ${C.border}`,
+                        }}>
+                          {/* Nefndarmenn */}
+                          <div style={{
+                            fontSize: '0.68rem', textTransform: 'uppercase',
+                            letterSpacing: '0.12em', color: C.textMuted,
+                            marginBottom: '0.4rem', fontWeight: 600,
+                            display: 'flex', alignItems: 'center', gap: '0.35rem',
+                          }}>
+                            <IconUsers size={12} color={C.textMuted} />
+                            Nefndarmenn
+                          </div>
+                          <div style={{
+                            fontSize: '0.83rem', color: C.textSub, lineHeight: 1.8,
+                            marginBottom: parsed.forseti ? '0.15rem' : '0',
+                          }}>
+                            {parsed.nefndarmenn.map((name, i) => (
+                              <span key={i}>
+                                {i > 0 && ', '}
+                                <ClickableName name={name} onClick={openPerson} />
+                              </span>
+                            ))}
+                            {parsed.forseti && (
+                              <span style={{ display: 'block', marginTop: '0.2rem', fontStyle: 'italic', fontSize: '0.8rem' }}>
+                                Í forsæti var <ClickableName name={parsed.forseti} onClick={openPerson} />.
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Starfsmenn / Aðrir */}
+                          {parsed.starfsmenn && (
+                            <>
+                              <div style={{
+                                borderTop: `1px solid ${C.border}`,
+                                marginTop: '0.65rem', paddingTop: '0.65rem',
+                                fontSize: '0.68rem', textTransform: 'uppercase',
+                                letterSpacing: '0.12em', color: C.textMuted,
+                                marginBottom: '0.4rem', fontWeight: 600,
+                              }}>
+                                Starfsmenn / Aðrir
+                              </div>
+                              <div style={{
+                                fontSize: '0.8rem', color: C.textSub, lineHeight: 1.7,
+                              }}>
+                                {(() => {
+                                  const staffNames = extractNamesFromText(parsed.starfsmenn);
+                                  if (staffNames.length === 0) return parsed.starfsmenn;
+                                  // Render with clickable names
+                                  let remaining = parsed.starfsmenn;
+                                  const elements: React.ReactNode[] = [];
+                                  let key = 0;
+                                  for (const name of staffNames) {
+                                    const idx = remaining.indexOf(name);
+                                    if (idx === -1) continue;
+                                    if (idx > 0) elements.push(<span key={key++}>{remaining.slice(0, idx)}</span>);
+                                    elements.push(<ClickableName key={key++} name={name} onClick={openPerson} />);
+                                    remaining = remaining.slice(idx + name.length);
+                                  }
+                                  if (remaining) elements.push(<span key={key++}>{remaining}</span>);
+                                  return elements;
+                                })()}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      );
+                    }
+
+                    // Fallback: show thatttakendur array with clickable names
+                    if (selected.thatttakendur?.length > 0) {
+                      return (
+                        <div style={{
+                          marginBottom: '1.25rem',
+                          background: C.bg, borderRadius: 8, padding: '0.85rem 1rem',
+                          border: `1px solid ${C.border}`,
+                        }}>
+                          <div style={{
+                            fontSize: '0.68rem', textTransform: 'uppercase',
+                            letterSpacing: '0.12em', color: C.textMuted,
+                            marginBottom: '0.5rem', fontWeight: 600,
+                            display: 'flex', alignItems: 'center', gap: '0.35rem',
+                          }}>
+                            <IconUsers size={12} color={C.textMuted} />
+                            Þátttakendur
+                          </div>
+                          <div style={{
+                            fontSize: '0.83rem', color: C.textSub, lineHeight: 1.7,
+                          }}>
+                            {selected.thatttakendur.map((name, i) => (
+                              <span key={i}>
+                                {i > 0 && ' · '}
+                                <ClickableName name={name} onClick={openPerson} />
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return null;
+                  })()}
 
                   <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: '1.25rem' }}>
                     <div style={{
@@ -837,7 +1174,12 @@ export default function Home() {
                             fontSize: '0.81rem', color: C.textSub, lineHeight: 1.65,
                             whiteSpace: 'pre-line', marginBottom: l.akvardan ? '0.4rem' : 0,
                           }}>
-                            {l.texti}
+                            {l.texti.split('\n').map((line, li) => (
+                              <span key={li}>
+                                {li > 0 && '\n'}
+                                {renderTextWithMalsnumer(line)}
+                              </span>
+                            ))}
                           </div>
                         )}
                         {l.akvardan && (
