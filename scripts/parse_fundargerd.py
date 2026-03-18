@@ -20,11 +20,12 @@ except ImportError:
 def parse_attendees(text: str) -> list[str]:
     """Finnur nöfn þátttakenda úr texta."""
     # Fjarlægir allt á eftir "Að auki" eða "í forsæti"
-    text = re.split(r'Að auki|í forsæti', text, flags=re.IGNORECASE)[0]
+    names_text = re.split(r'Að auki|í forsæti', text, flags=re.IGNORECASE)[0]
     # Fjarlægir "Viðstaddir:" og svipað
-    text = re.sub(r'^Viðstaddir:\s*', '', text.strip())
-    # Skiptir á kommu og hreinsnar
-    names = [n.strip().rstrip('.') for n in text.split(',') if n.strip()]
+    names_text = re.sub(r'^Viðstaddir:\s*', '', names_text.strip())
+    # Skiptir á kommu og "og" og hreinsnar
+    names_text = re.sub(r'\s+og\s+', ', ', names_text)
+    names = [n.strip().rstrip('.') for n in names_text.split(',') if n.strip()]
     return [n for n in names if len(n) > 3]
 
 
@@ -47,6 +48,7 @@ def parse_html(html_content: str, filename: str = "") -> dict:
         "dagsetning": None,
         "titill": None,
         "thatttakendur": [],
+        "vidstaddir_texti": None,
         "dagskrarlidur": [],
         "source_url": None,
     }
@@ -94,12 +96,25 @@ def parse_html(html_content: str, filename: str = "") -> dict:
                 break
 
     # --- Þátttakendur ---
+    # Collect the full attendee text block (may span multiple paragraphs)
     paragraphs = single_item.find_all("p")
-    for p in paragraphs[:3]:  # Þátttakendur eru alltaf efst
+    vidstaddir_parts = []
+    found_vidstaddir = False
+    for p in paragraphs[:8]:  # Attendee info is in the first few paragraphs
         txt = p.get_text(strip=True)
         if "Viðstaddir" in txt or "viðstaddir" in txt:
+            found_vidstaddir = True
+            vidstaddir_parts.append(txt)
             result["thatttakendur"] = parse_attendees(txt)
-            break
+        elif found_vidstaddir:
+            # Capture continuation lines (Að auki, forföll, etc.)
+            if any(kw in txt.lower() for kw in ["að auki", "boðaði forföll", "sat fundinn", "sat fyrir"]):
+                vidstaddir_parts.append(txt)
+            else:
+                break  # Stop when we hit non-attendee content
+
+    if vidstaddir_parts:
+        result["vidstaddir_texti"] = " ".join(vidstaddir_parts)
 
     # --- Dagskrárliðir (h3 tags) ---
     dagskrar = []

@@ -20,6 +20,11 @@ export async function setupDatabase() {
     );
   `;
 
+  // Add vidstaddir_texti column if not exists
+  await sql`
+    ALTER TABLE fundargerdir ADD COLUMN IF NOT EXISTS vidstaddir_texti TEXT
+  `;
+
   // Sérstök tafla fyrir málsnúmer → auðveldar timeline leit
   await sql`
     CREATE TABLE IF NOT EXISTS malsnumer_index (
