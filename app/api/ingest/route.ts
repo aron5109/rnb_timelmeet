@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
           ${fg.nefnd as string},
           ${fg.dagsetning as string},
           ${fg.titill as string},
-         ${(fg.thatttakendur as string[]) || []},
+          ${JSON.stringify(fg.thatttakendur || [])},
           ${JSON.stringify(fg.dagskrarlidur)}::jsonb,
           ${fg.source_url as string},
           to_tsvector('simple', ${leitartexti})
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
           nefnd = EXCLUDED.nefnd,
           dagsetning = EXCLUDED.dagsetning,
           titill = EXCLUDED.titill,
-          thatttakendur = EXCLUDED.thatttakendur,
+          thatttakendur = ${JSON.stringify(fg.thatttakendur || [])}::jsonb,
           dagskrarlidur = EXCLUDED.dagskrarlidur,
           source_url = EXCLUDED.source_url,
           leitartexti = EXCLUDED.leitartexti,
