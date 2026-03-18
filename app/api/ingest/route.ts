@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
           ${fg.nefnd as string},
           ${fg.dagsetning as string},
           ${fg.titill as string},
-          ${JSON.stringify(fg.thatttakendur)}::text[],
+         ${(fg.thatttakendur as string[]) || []},
           ${JSON.stringify(fg.dagskrarlidur)}::jsonb,
           ${fg.source_url as string},
           to_tsvector('simple', ${leitartexti})
