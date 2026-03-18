@@ -178,7 +178,7 @@ export default function Home() {
   const [timelineLoading, setTimelineLoading] = useState(false);
 
   useEffect(() => {
-    fetch('/api/search', { method: 'PUT' }).then(r => r.json()).then(setNefndir).catch(() => {});
+    fetch('/api/fundargerdir?nefndir=1').then(r => r.json()).then(d => setNefndir(d.nefndir)).catch(() => {});
   }, []);
 
   const search = useCallback(async (p = 1) => {
@@ -190,21 +190,17 @@ export default function Home() {
       if (fra) params.set('fra', fra);
       if (til) params.set('til', til);
       params.set('page', String(p));
-      setResults(await (await fetch(`/api/search?${params}`)).json());
+      setResults(await (await fetch(`/api/fundargerdir?${params}`)).json());
       setPage(p);
     } finally { setLoading(false); }
   }, [query, nefnd, fra, til]);
 
   useEffect(() => { search(1); }, []);
 
-  const openDetail = async (id: number) => {
+const openDetail = async (id: number) => {
     setDetailLoading(true);
     try {
-      setSelected(await (await fetch('/api/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      })).json());
+      setSelected(await (await fetch(`/api/fundargerdir?id=${id}`)).json());
     } finally { setDetailLoading(false); }
   };
 
