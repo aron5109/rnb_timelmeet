@@ -46,11 +46,16 @@ const C = {
   blueText:  '#1d4ed8',
 };
 
+const IS_MONTHS_LONG  = ['janúar','febrúar','mars','apríl','maí','júní','júlí','ágúst','september','október','nóvember','desember'];
+const IS_MONTHS_SHORT = ['jan.','feb.','mar.','apr.','maí','jún.','júl.','ágú.','sep.','okt.','nóv.','des.'];
+
 function formatDate(iso: string, short = false): string {
   try {
-    return new Date(iso).toLocaleDateString('is-IS', short
-      ? { day: 'numeric', month: 'short', year: 'numeric' }
-      : { day: 'numeric', month: 'long', year: 'numeric' });
+    const d = new Date(iso);
+    const day = d.getDate();
+    const month = short ? IS_MONTHS_SHORT[d.getMonth()] : IS_MONTHS_LONG[d.getMonth()];
+    const year = d.getFullYear();
+    return `${day}. ${month} ${year}`;
   } catch { return iso; }
 }
 
